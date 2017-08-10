@@ -1,0 +1,2 @@
+/home/pfoytik/RiderProjects/pofPrototype/obj/Debug/pofPrototype.csprojResolveAssemblyReference.cache
+/home/pfoytik/RiderProjects/pofPrototype/obj/Debug/pofPrototype.csproj.CoreCompileInputs.cache
