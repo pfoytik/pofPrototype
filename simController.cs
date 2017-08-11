@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Xsl.Runtime;
 
 namespace pofPrototype
 {
@@ -10,6 +11,7 @@ namespace pofPrototype
         public double totalSystemResource { get; set; }
         public int n_peers { get; set; }
         public Dictionary<int, peer_obj> peersResource;
+        public Dictionary<int, double> peerStakes;
         public DateTime sys_Time { get; set; }
         public List<int> weightedPeer_IDs;
         public static Random theRand = new Random(1);
@@ -40,13 +42,24 @@ namespace pofPrototype
             }                                                            
         }
 
+        public void re_stake()
+        {
+            double desire, chosenStake;
+            foreach (KeyValuePair<int, peer_obj> kvp in peersResource)
+            {
+                desire = kvp.Value.gen_desiredStake(10);
+                chosenStake = kvp.Value.chooseStake();
+                Console.WriteLine("re stake : " + kvp.Key + " : " + desire + " : " + chosenStake);
+            }
+        }
+
         //Main start to the simulation
         //controlled by number of transactions
         public void runSimulation(int transactions)
         {
             
             for (int i = 0; i < transactions; i++)
-            {
+            {                
                 Console.WriteLine("starting transaction " + i);
                 int leader = selectLeader();
 
@@ -56,6 +69,7 @@ namespace pofPrototype
                 x = dist.getByte(x);
                 
                 peersResource[leader].broadCastPeers(peersResource, i, x);
+                re_stake();
             }
             
         }
@@ -64,11 +78,41 @@ namespace pofPrototype
         public int selectLeader()
         {
             distributions d = new distributions(1);
-            int theChosenOne;
+            int theChosenOne = 0;
+            bool leaderFound = false;
             createWeightedList();
+            broadcastStakes();
+            
+            //debugging option for easy leader selection
+            //theChosenOne = d.getUniformBetween(0, weightedPeer_IDs.Count);
+            //Console.WriteLine("##### RAND " + theChosenOne + " " + weightedPeer_IDs.Count);
+            
+            int j = 0;
+            //for reals algo leader select
+            while (j < 100 && !leaderFound)
+            {
+                //Console.WriteLine(j);
+                foreach (KeyValuePair<int, peer_obj> kvp in peersResource)
+                {
+                    //start broadcasting leader requests
+                    if (kvp.Value.current_stake > j)
+                    {
+                        if (kvp.Value.leaderRequest(peersResource, weightedPeer_IDs))
+                        {
+                            //leader is chosen
+                            theChosenOne = kvp.Key;
+                            leaderFound = true;
+                        }
+                    }
+                }
+                j++;
+            }
 
-            theChosenOne = d.getUniformBetween(0, weightedPeer_IDs.Count);
-            return weightedPeer_IDs[theChosenOne];
+            if (!leaderFound)
+                theChosenOne = selectLeader();
+
+            Console.WriteLine("Leader was found after : " + j + " iterations");
+            return theChosenOne;
         }
 
         //creates a list of ids based on their chosen weight
@@ -78,16 +122,16 @@ namespace pofPrototype
         public void createWeightedList()
         {
             weightedPeer_IDs = new List<int>();
-            
+            peerStakes = new Dictionary<int, double>();
             //uses a parallel function to efficiently let the peer objects
             //construct their sublists which is then combined
             //Parallel.ForEach(peersResource, (pair, state, arg3) =>
 
             foreach(KeyValuePair<int, peer_obj> pair in peersResource)
             {
-                Console.WriteLine("counting parallel " + peersResource.Count);
+                //Console.WriteLine("counting parallel " + peersResource.Count);
                 weightedPeer_IDs.AddRange(pair.Value.createListPortion());
-                
+                peerStakes.Add(pair.Key, pair.Value.current_stake);
             }
             //});
                         
@@ -102,6 +146,14 @@ namespace pofPrototype
                                   " latest state : " + Encoding.Default.GetString(kvp.Value.ledger_state()));
             }
             Console.WriteLine("----------------------------------");
+        }
+
+        public void broadcastStakes()
+        {
+            foreach (KeyValuePair<int, peer_obj> kvp in peersResource)
+            {
+                kvp.Value.recieveStakes(peerStakes);
+            }
         }
 
     }

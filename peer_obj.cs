@@ -14,6 +14,7 @@ namespace pofPrototype
         public ledger_obj ledger;
         public distributions localDist;
         public List<int> sublist;
+        public Dictionary<int, double> peerStakes;
 
         public peer_obj(int i)
         {
@@ -58,13 +59,38 @@ namespace pofPrototype
                 sublist.Add(ID);
             }
             
-            Console.WriteLine("total sublist for " + ID + " " + sublist.Count);
+            //Console.WriteLine("total sublist for " + ID + " " + sublist.Count);
             return sublist;
         }
         
         public void recieveBroadcast(int key, byte[] val)
         {
             ledger.add_block(key, val);
+        }
+
+        public bool recieveLeaderRequest(int key, double stake, List<int> weightedList)
+        {
+            if (peerStakes.ContainsKey(key))
+            {
+                if (peerStakes[key] == stake)
+                {
+                    if(key == weightedList[localDist.getUniformBetween(0, weightedList.Count)])
+                        return true;
+                }
+                else
+                    return false;
+            }
+            else
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        public void recieveStakes(Dictionary<int, double> steakDinner)
+        {
+            peerStakes = steakDinner;
         }
             
         public void broadCastPeers(Dictionary<int, peer_obj> ctrl, int key, byte[] val)
@@ -76,6 +102,23 @@ namespace pofPrototype
                 if(pair.Key!=ID)
                     pair.Value.recieveBroadcast(key, val);  
             });
+        }
+
+        public bool leaderRequest(Dictionary<int, peer_obj> ctrl, List<int> weightedList)
+        {
+            int tally = 0;
+            foreach (KeyValuePair<int, peer_obj> kvp in ctrl)
+            {
+                if (kvp.Value.recieveLeaderRequest(ID, current_stake, weightedList))
+                    tally++;
+            }
+
+            if (tally > (peerStakes.Count / 2))
+            {
+                return true;
+            }
+            
+            return false;
         }
         
     }
