@@ -24,7 +24,7 @@ namespace pofPrototype
             ledger = new ledger_obj(i);
             
             //for debuging include int seed
-            localDist = new distributions(1);
+            //localDist = new distributions(1);
         }
 
         public void set_desiredStake(double desired)
@@ -45,17 +45,21 @@ namespace pofPrototype
 
         public double chooseStake()
         {
-            current_stake = desired_stake * localDist.getNormal(desired_stake, 1);
+            //current_stake = desired_stake * localDist.getNormal(desired_stake, 1);
+            current_stake = Convert.ToDouble(localDist.getUniformBetween(Convert.ToInt16(desired_stake), 100));
             return current_stake;
         }
 
-        public void createListPortion()
+        public List<int> createListPortion()
         {
             List<int> sublist = new List<int>();
             for(int i=0; i<current_stake; i++)
             {
                 sublist.Add(ID);
-            }            
+            }
+            
+            Console.WriteLine("total sublist for " + ID + " " + sublist.Count);
+            return sublist;
         }
         
         public void recieveBroadcast(int key, byte[] val)
@@ -64,11 +68,13 @@ namespace pofPrototype
         }
             
         public void broadCastPeers(Dictionary<int, peer_obj> ctrl, int key, byte[] val)
-        {            
+        {
+            recieveBroadcast(key, val);
             //assuming the info is good to submit, probably would need to be checked though...
             Parallel.ForEach(ctrl, (pair, state, arg3) =>
             {
-                pair.Value.recieveBroadcast(key, val);  
+                if(pair.Key!=ID)
+                    pair.Value.recieveBroadcast(key, val);  
             });
         }
         

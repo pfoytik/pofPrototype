@@ -11,9 +11,20 @@ namespace pofPrototype
             rand = new Random();
         }
 
+        public distributions(Random r)
+        {
+            rand = r;
+        }
+        
         public distributions(int seed)
         {
             rand = new Random(seed);
+        }
+
+        public byte[] getByte(byte[] g)
+        {
+            rand.NextBytes(g);
+            return g;
         }
 
         public double getNormal(double avg, double stdDev)

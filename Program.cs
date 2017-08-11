@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace pofPrototype
 {
     internal class Program
-    {               
+    {
         public static void Main(string[] args)
         {
             //create the simController telling it the number of peer nodes
@@ -13,6 +13,7 @@ namespace pofPrototype
 
             //run the simulation by telling it the number of transactions
             sc.runSimulation(5);
+            sc.report();
         }
     }
 }
