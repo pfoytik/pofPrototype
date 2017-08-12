@@ -1,11 +1,33 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Xsl.Runtime;
 
 namespace pofPrototype
 {
+    public class dataStore
+    {
+        //stats
+        public int epoch, maxIT, minIT, totIT;
+        public double avgIT;
+        public TimeSpan avgTX, maxTX, minTX, totTX;
+
+        public dataStore()
+        {
+            epoch = 0;
+            maxIT = 0;
+            minIT = 0;
+            totIT = 0;
+            avgIT = 0;
+            avgTX = TimeSpan.MinValue;
+            maxTX = TimeSpan.MinValue;
+            minTX = TimeSpan.MinValue;
+            totTX = TimeSpan.MinValue;
+        }
+    }
+    
     public class simController
     {
         public double totalSystemResource { get; set; }
@@ -14,14 +36,17 @@ namespace pofPrototype
         public Dictionary<int, double> peerStakes;
         public DateTime sys_Time { get; set; }
         public List<int> weightedPeer_IDs;
-        public static Random theRand = new Random(1);
+        public static Random theRand = new Random(Environment.TickCount);
         public distributions dist = new distributions(theRand);
-        
+        public dataStore datar;
+        public int epoch, epochIT, epochTX;
+        public double avgTX, totTX;
+               
         public simController(int n, double res)
         {
             ledger_obj gen = new ledger_obj(1);
             byte[] a = new byte[100];
-            gen.gen_ledger(dist.getUniformBetween(1,100),a);
+            gen.gen_ledger(dist.getUniformBetween(1,100),a);          
             
             double chosenStake, desire;
             sys_Time = DateTime.Now;
@@ -34,11 +59,11 @@ namespace pofPrototype
                 peer_obj p = new peer_obj(i);
                 p.localDist = dist;
                 p.ledger.gen_ledger(gen.ledger[0].key, gen.ledger[0].value);
-                desire = p.gen_desiredStake(10);
+                desire = p.gen_desiredStake(dist.getUniformBetween(0,100));
                 chosenStake = p.chooseStake();
                 peersResource.Add(i, p);
                 
-                Console.WriteLine("created peer : " + i + " : " + desire + " : " + chosenStake + " " + peersResource.Count);
+                //Console.WriteLine("created peer : " + i + " : " + desire + " : " + chosenStake + " " + peersResource.Count);
             }                                                            
         }
 
@@ -49,7 +74,7 @@ namespace pofPrototype
             {
                 desire = kvp.Value.gen_desiredStake(10);
                 chosenStake = kvp.Value.chooseStake();
-                Console.WriteLine("re stake : " + kvp.Key + " : " + desire + " : " + chosenStake);
+                //Console.WriteLine("re stake : " + kvp.Key + " : " + desire + " : " + chosenStake);
             }
         }
 
@@ -57,21 +82,55 @@ namespace pofPrototype
         //controlled by number of transactions
         public void runSimulation(int transactions)
         {
-            
+            datar = new dataStore();
+            DateTime current = new DateTime();
+            DateTime end = new DateTime();
+            TimeSpan diff = new TimeSpan();
+            TimeSpan tot = new TimeSpan();
             for (int i = 0; i < transactions; i++)
-            {                
-                Console.WriteLine("starting transaction " + i);
+            {
+                datar.epoch = i;
+                epoch = i;
+                epochIT = 0;
+                epochTX = 0;
+                current = DateTime.Now; 
+                //Console.WriteLine("starting transaction " + i);
                 int leader = selectLeader();
 
-                Console.WriteLine("You are the chosen one! " + leader);
+                if (epochIT > datar.maxIT || datar.maxIT == 0)
+                    datar.maxIT = epochIT;
+                if (epochIT < datar.minIT || datar.minIT == 0)
+                    datar.minIT = epochIT;
+                
+                //Console.WriteLine("You are the chosen one! " + leader);
                 byte[] x = new byte[100];
                 //generate random byte array
                 x = dist.getByte(x);
                 
                 peersResource[leader].broadCastPeers(peersResource, i, x);
                 re_stake();
+                end = DateTime.Now;
+
+                diff = end - current;
+
+                if (i == 0)
+                    tot = diff;
+                else
+                    tot += diff;
+                
+                datar.totTX = diff;             
+                if (diff < datar.minTX || datar.minTX == TimeSpan.MinValue)
+                    datar.minTX = diff;
+                if (diff > datar.maxTX || datar.maxTX == TimeSpan.MinValue)
+                    datar.maxTX = diff;
+
+                totTX += diff.Milliseconds;
             }
-            
+
+            //calc avg tx time           
+            avgTX = totTX / transactions;
+            datar.avgIT = datar.totIT / transactions;
+
         }
 
         //creates a weighted list and randomly selects and id from it
@@ -106,12 +165,15 @@ namespace pofPrototype
                     }
                 }
                 j++;
+               
             }
 
+            datar.totIT += j;
+            epochIT += j;
             if (!leaderFound)
                 theChosenOne = selectLeader();
 
-            Console.WriteLine("Leader was found after : " + j + " iterations");
+            //Console.WriteLine("Epoch: " + epoch + " Leader was found after : " + j + " iterations");
             return theChosenOne;
         }
 
@@ -139,13 +201,21 @@ namespace pofPrototype
 
         public void report()
         {
-            Console.WriteLine("----------------------------------");
+            double totCheek = 0;
+            //Console.WriteLine("----------------------------------");            
             foreach (KeyValuePair<int, peer_obj> kvp in peersResource)
-            {
-                Console.WriteLine("peer " + kvp.Key + " ledger length : " + kvp.Value.ledger.ledger.Count +
-                                  " latest state : " + Encoding.Default.GetString(kvp.Value.ledger_state()));
+            {                
+                //Console.WriteLine("peer " + kvp.Key + " ledger length : " + kvp.Value.ledger.ledger.Count +
+                //                  " latest state : " + Encoding.Default.GetString(kvp.Value.ledger_state()));                
+                //Console.WriteLine("avgLead, avgStake, totLead, totalCheekLead");
+                //Console.WriteLine(kvp.Value.getAvgLead(epoch+1) + "," + kvp.Value.getAvgStake(epoch+1) + "," + kvp.Value.totLead + "," + kvp.Value.totalCheekLead);
+    
+                totCheek += kvp.Value.totalCheekLead;
             }
-            Console.WriteLine("----------------------------------");
+            
+            //Console.WriteLine("avgIT, minIT, maxIT, avgTX, minTX, maxTX, totTX");
+            Console.WriteLine(datar.avgIT + "," + datar.minIT + "," + datar.maxIT + "," + avgTX + "," + datar.minTX.Milliseconds + "," + datar.maxTX.Milliseconds + "," + totTX + "," + totCheek);
+            //Console.WriteLine("----------------------------------");
         }
 
         public void broadcastStakes()

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net.Mime;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace pofPrototype
@@ -15,7 +17,10 @@ namespace pofPrototype
         public distributions localDist;
         public List<int> sublist;
         public Dictionary<int, double> peerStakes;
-
+        
+        //stats
+        public double avgStake, avgLead, totLead, totalCheekLead, totalStake;
+        
         public peer_obj(int i)
         {
             ID = i;
@@ -23,11 +28,26 @@ namespace pofPrototype
             current_stake = 0;
             desired_stake = 0;
             ledger = new ledger_obj(i);
-            
+            totLead = 0;
+            totalCheekLead = 0;
+            totalStake = 0;
+
             //for debuging include int seed
             //localDist = new distributions(1);
         }
 
+        public double getAvgStake(int t)
+        {
+            avgStake = totalStake / t;
+            return avgStake;
+        }
+
+        public double getAvgLead(int t)
+        {
+            avgLead = totLead / t;
+            return avgLead;
+        }
+        
         public void set_desiredStake(double desired)
         {
             desired_stake = desired;
@@ -46,8 +66,21 @@ namespace pofPrototype
 
         public double chooseStake()
         {
+            //artificial delay
+            //int mili = localDist.getUniformBetween(10, 20);
+            //Thread.Sleep(mili);
+            
             //current_stake = desired_stake * localDist.getNormal(desired_stake, 1);
-            current_stake = Convert.ToDouble(localDist.getUniformBetween(Convert.ToInt16(desired_stake), 100));
+            current_stake = Convert.ToDouble(localDist.getNormal(desired_stake, 10));
+            if (current_stake > 100)
+                current_stake = 100;
+            else
+            {
+                if (current_stake < 0)
+                    current_stake = 0;                                    
+            }
+
+            totalStake += current_stake;             
             return current_stake;
         }
 
@@ -70,6 +103,9 @@ namespace pofPrototype
 
         public bool recieveLeaderRequest(int key, double stake, List<int> weightedList)
         {
+            //int mili = localDist.getUniformBetween(1, 5);
+            //Thread.Sleep(mili);
+            
             if (peerStakes.ContainsKey(key))
             {
                 if (peerStakes[key] == stake)
@@ -107,14 +143,22 @@ namespace pofPrototype
         public bool leaderRequest(Dictionary<int, peer_obj> ctrl, List<int> weightedList)
         {
             int tally = 0;
+            bool cheekflag = false;
             foreach (KeyValuePair<int, peer_obj> kvp in ctrl)
             {
+                if (kvp.Value.current_stake > current_stake)
+                    cheekflag = true;
                 if (kvp.Value.recieveLeaderRequest(ID, current_stake, weightedList))
                     tally++;
             }
 
             if (tally > (peerStakes.Count / 2))
             {
+                totLead++;
+                
+                if (cheekflag)
+                    totalCheekLead++;
+                
                 return true;
             }
             
